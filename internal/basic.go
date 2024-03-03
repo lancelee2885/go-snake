@@ -82,10 +82,15 @@ func (g *Game) Start() {
 	for {
 		select {
 		case <-movementTicker.C:
-			moveSnake(&snake, direction, food)
+			moveSnake(board, &snake, direction, food, quit)
+			if g.isGameOver(board, snake) {
+				g.Screen.Clear()
+				g.renderGameOver(score)
+				break
+			}
 			if snake[0] == food {
 				score++
-				food = generateFood(board)
+				food = g.generateFood(board)
 			}
 			g.renderBoard(board, snake, food, score)
 			g.Screen.Show()
@@ -105,10 +110,10 @@ func (g *Game) renderBoard(board [][]rune, snakeBody []Coord, food Coord, score 
 		for j, cell := range row {
 			style := tcell.StyleDefault // Default style
 			if containsCoord(snakeBody, Coord{X: j, Y: i}) {
-				style = style.Foreground(tcell.ColorGreen) // Example: Snake in green
+				style = style.Foreground(tcell.ColorGreen)
 				g.Screen.SetContent(j, i, 'X', nil, style)
 			} else if food.X == j && food.Y == i {
-				style = style.Foreground(tcell.ColorRed) // Example: Food in red
+				style = style.Foreground(tcell.ColorRed)
 				g.Screen.SetContent(j, i, '*', nil, style)
 			} else {
 				g.Screen.SetContent(j, i, cell, nil, style)
@@ -128,7 +133,38 @@ func (g *Game) renderBoard(board [][]rune, snakeBody []Coord, food Coord, score 
 		g.Screen.SetContent(width+1, y, tcell.RuneVLine, nil, style) // Right border
 	}
 
+	// Render score
+	scoreText := fmt.Sprintf("Score: %d", score)
+	for i, r := range scoreText {
+		g.Screen.SetContent(i+1, len(board)+2, r, nil, style)
+	}
+
 	g.Screen.SetStyle(tcell.StyleDefault)
+}
+
+func (g *Game) renderGameOver(score int) {
+
+	width, height := g.Screen.Size()
+
+	gameOverText := "GAME OVER"
+	scoreText := fmt.Sprintf("Final Score: %d", score)
+
+	// Calculate positions for centered text
+	textX := width/2 - len(gameOverText)/2
+	textY := height/2 - 2
+
+	// Render text with styling
+	style := tcell.StyleDefault.Bold(true).Foreground(tcell.ColorRed)
+	for _, r := range gameOverText {
+		g.Screen.SetContent(textX, textY, r, nil, style)
+		textX++
+	}
+	textX = width/2 - len(scoreText)/2
+	g.Screen.SetContent(textX, textY+2, ' ', nil, tcell.StyleDefault) // Reset to default style
+	for _, r := range scoreText {
+		g.Screen.SetContent(textX, textY+2, r, nil, tcell.StyleDefault)
+		textX++
+	}
 }
 
 func containsCoord(coords []Coord, c Coord) bool {
@@ -140,7 +176,7 @@ func containsCoord(coords []Coord, c Coord) bool {
 	return false
 }
 
-func generateFood(board [][]rune) Coord {
+func (g *Game) generateFood(board [][]rune) Coord {
 	boardWidth, boardHeight := len(board[0]), len(board)
 	for {
 		food := Coord{X: randInt(1, boardWidth-2), Y: randInt(1, boardHeight-2)}
