@@ -27,6 +27,7 @@ type Coord struct {
 type Game struct {
 	Config GameConfig
 	Screen tcell.Screen
+	Dead   bool
 }
 
 type GameConfig struct {
@@ -79,13 +80,15 @@ func (g *Game) Start() {
 
 	// Main game loop
 	movementTicker := time.NewTicker(200 * time.Millisecond)
-	for {
+	gameOver := false
+	for !gameOver {
 		select {
 		case <-movementTicker.C:
 			moveSnake(board, &snake, direction, food, quit)
 			if g.isGameOver(board, snake) {
 				g.Screen.Clear()
-				g.renderGameOver(score)
+				g.Screen.Show()
+				gameOver = true
 				break
 			}
 			if snake[0] == food {
@@ -93,12 +96,12 @@ func (g *Game) Start() {
 				food = g.generateFood(board)
 			}
 			g.renderBoard(board, snake, food, score)
-			g.Screen.Show()
 		case <-quit:
 			movementTicker.Stop()
 			return
 		}
 	}
+	g.renderGameOver(score, quit)
 }
 
 func (g *Game) renderBoard(board [][]rune, snakeBody []Coord, food Coord, score int) {
@@ -111,7 +114,12 @@ func (g *Game) renderBoard(board [][]rune, snakeBody []Coord, food Coord, score 
 			style := tcell.StyleDefault // Default style
 			if containsCoord(snakeBody, Coord{X: j, Y: i}) {
 				style = style.Foreground(tcell.ColorGreen)
-				g.Screen.SetContent(j, i, 'X', nil, style)
+				body := 'x'
+				if snakeBody[0].X == j && snakeBody[0].Y == i {
+					style = style.Bold(true)
+					body = 'X'
+				}
+				g.Screen.SetContent(j, i, body, nil, style)
 			} else if food.X == j && food.Y == i {
 				style = style.Foreground(tcell.ColorRed)
 				g.Screen.SetContent(j, i, '*', nil, style)
@@ -140,11 +148,13 @@ func (g *Game) renderBoard(board [][]rune, snakeBody []Coord, food Coord, score 
 	}
 
 	g.Screen.SetStyle(tcell.StyleDefault)
+
+	g.Screen.Show()
 }
 
-func (g *Game) renderGameOver(score int) {
+func (g *Game) renderGameOver(score int, quit chan struct{}) {
 
-	width, height := g.Screen.Size()
+	width, height := g.Config.BoardWidth, g.Config.BoardHeight
 
 	gameOverText := "GAME OVER"
 	scoreText := fmt.Sprintf("Final Score: %d", score)
@@ -165,6 +175,52 @@ func (g *Game) renderGameOver(score int) {
 		g.Screen.SetContent(textX, textY+2, r, nil, tcell.StyleDefault)
 		textX++
 	}
+	pressAnyKeyText := "Press any key to restart"
+	textX = width/2 - len(pressAnyKeyText)/2
+	g.Screen.SetContent(textX, textY+4, ' ', nil, tcell.StyleDefault) // Reset to default style
+	for _, r := range pressAnyKeyText {
+		g.Screen.SetContent(textX, textY+4, r, nil, tcell.StyleDefault)
+		textX++
+	}
+
+	g.Screen.Show()
+
+	// Wait for key press to restart
+	ev := g.Screen.PollEvent()
+	for ev != nil {
+		if ev, ok := ev.(*tcell.EventKey); ok {
+			if ev.Key() != tcell.KeyEscape { // Restart on any key except Escape
+				g.restartGame(quit)
+				return
+			}
+		}
+		ev = g.Screen.PollEvent()
+	}
+}
+
+func (g *Game) restartGame(quit chan struct{}) {
+	// Signal all goroutines to stop
+	close(quit)
+
+	// Properly stop and clear the screen
+	g.Screen.Clear()
+	g.Screen.Fini() // Properly finalize the screen
+
+	// Reinitialize the game state and start a new game
+	newGame := NewGame(g.Config, g.Screen)
+	newGame.Start()
+}
+
+func (g *Game) resetBoard() [][]rune {
+	boardWidth, boardHeight := g.Config.BoardWidth, g.Config.BoardHeight
+	board := make([][]rune, boardHeight)
+	for i := range board {
+		board[i] = make([]rune, boardWidth)
+		for j := range board[i] {
+			board[i][j] = ' '
+		}
+	}
+	return board
 }
 
 func containsCoord(coords []Coord, c Coord) bool {

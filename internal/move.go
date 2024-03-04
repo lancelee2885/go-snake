@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"fmt"
+// "fmt"
 )
 
 func moveSnake(board [][]rune, snake *[]Coord, direction Direction, food Coord, quit chan struct{}) {
@@ -27,7 +27,6 @@ func moveSnake(board [][]rune, snake *[]Coord, direction Direction, food Coord, 
 
 	if newHead.X < 0 || newHead.X >= len(board[0]) ||
 		newHead.Y < 0 || newHead.Y >= len(board) {
-		fmt.Println("Game Over! You hit the wall.")
 		close(quit) // Signal to end the game
 		return
 	}
