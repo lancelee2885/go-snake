@@ -211,18 +211,6 @@ func (g *Game) restartGame(quit chan struct{}) {
 	newGame.Start()
 }
 
-func (g *Game) resetBoard() [][]rune {
-	boardWidth, boardHeight := g.Config.BoardWidth, g.Config.BoardHeight
-	board := make([][]rune, boardHeight)
-	for i := range board {
-		board[i] = make([]rune, boardWidth)
-		for j := range board[i] {
-			board[i][j] = ' '
-		}
-	}
-	return board
-}
-
 func containsCoord(coords []Coord, c Coord) bool {
 	for _, coord := range coords {
 		if coord.X == c.X && coord.Y == c.Y {
