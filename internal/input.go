@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"os"
+
 	"github.com/gdamore/tcell/v2"
 )
 
@@ -10,15 +12,29 @@ func (g *Game) processInput(snake *[]Coord, direction *Direction, quit chan stru
 	case *tcell.EventKey:
 		switch ev.Key() {
 		case tcell.KeyEscape:
-			close(quit)
+			select {
+			case quit <- struct{}{}:
+			default:
+				g.Screen.Fini()
+				close(quit)
+				os.Exit(0)
+			}
 		case tcell.KeyUp:
-			*direction = Up
+			if *direction != Down {
+				*direction = Up
+			}
 		case tcell.KeyDown:
-			*direction = Down
+			if *direction != Up {
+				*direction = Down
+			}
 		case tcell.KeyLeft:
-			*direction = Left
+			if *direction != Right {
+				*direction = Left
+			}
 		case tcell.KeyRight:
-			*direction = Right
+			if *direction != Left {
+				*direction = Right
+			}
 		}
 	}
 }
